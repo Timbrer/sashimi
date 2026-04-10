@@ -109,13 +109,9 @@ class MainWindow(QMainWindow):
         # check if experiment started or ended and update gui enabling
         if self.st.is_exp_started():
             self.set_enabled_gui(enable=False)
-            # pass down to the display window the information
-            self.wid_display.is_exp_started = True
 
         elif self.st.is_exp_ended():
             self.set_enabled_gui(enable=True)
-            # pass down to the display window the information
-            self.wid_display.is_exp_ended = True
 
     def set_enabled_gui(self, enable):
         """
@@ -128,7 +124,6 @@ class MainWindow(QMainWindow):
         self.wid_camera.setEnabled(enable)
         self.wid_save_options.setEnabled(enable)
         self.wid_display.auto_contrast_chk.setEnabled(enable)
-        self.wid_display.active_drift_chk.setEnabled(enable)
 
 
 class StatusWidget(QTabWidget):
