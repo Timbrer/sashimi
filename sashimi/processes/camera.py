@@ -89,8 +89,6 @@ class CameraProcess(LoggingProcess):
     Parameters
     ----------
     stop_event
-    wait_event
-    exp_trigger_event
     camera_id
     max_queue_size
     n_fps_frames
@@ -99,7 +97,6 @@ class CameraProcess(LoggingProcess):
     def __init__(
         self,
         stop_event: LoggedEvent,
-        wait_event: LoggedEvent,
         camera_id=0,
         max_queue_size=1200,
         n_fps_frames=20,
@@ -110,7 +107,6 @@ class CameraProcess(LoggingProcess):
         self.parameter_queue = Queue()
 
         self.stop_event = stop_event.new_reference(self.logger)
-        self.wait_event = wait_event.new_reference(self.logger)
         self.image_queue = ArrayQueue(max_mbytes=max_queue_size)
         self.camera_id = camera_id
         self.camera = None

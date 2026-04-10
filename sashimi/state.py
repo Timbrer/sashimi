@@ -340,7 +340,6 @@ class State:
         self.pause_after = False
         self.camera = CameraProcess(
             stop_event=self.stop_event,
-            wait_event=self.scanner.wait_signal,
         )
 
         self.multiprocessing_manager = MultiprocessingManager()
