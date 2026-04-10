@@ -8,7 +8,6 @@ import numpy as np
 import shutil
 import json
 from arrayqueues.shared_arrays import ArrayQueue
-from scopecuisine.notifiers import notifiers
 from sashimi.config import read_config
 from sashimi.processes.logging import LoggingProcess
 from sashimi.events import LoggedEvent, SashimiEvents
@@ -25,7 +24,6 @@ class SavingParameters:
     optimal_chunk_MB_RAM: int = conf[
         "array_ram_MB"
     ]  # Experimental value, might be different for different machines.
-    notification_email: str = "None"
     volumerate: float = 1
     voxel_size: tuple = (1, 1, 1)
     crop: tuple = (0, 0, None, None)
@@ -68,7 +66,6 @@ class StackSaver(LoggingProcess):
         self.frame_shape = None
         self.dtype = np.uint16
         self.duration_queue = duration_queue
-        self.notifier = notifiers[conf["notifier"]]
 
     def run(self):
         self.logger.log_message("started")
@@ -80,7 +77,6 @@ class StackSaver(LoggingProcess):
         self.close_log()
 
     def save_loop(self):
-        notifier = self.notifier("lightsheet", **conf["notifier_options"])
         # remove files if some are found at the save location
         Path(self.save_parameters.output_dir).mkdir(parents=True, exist_ok=True)
         if (
@@ -115,8 +111,6 @@ class StackSaver(LoggingProcess):
             self.update_saved_status_queue()
             self.finalize_dataset()
             self.current_data = None
-            if self.saving_signal.is_set():
-                notifier.notify()
 
         self.saving_signal.clear()
         self.saver_stopped_signal.set()

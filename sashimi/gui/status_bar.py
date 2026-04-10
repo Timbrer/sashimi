@@ -59,7 +59,6 @@ class StatusBarWidget(QStatusBar):
             GlobalState.PREVIEW: None,
             GlobalState.VOLUME_PREVIEW: self.state.volume_setting.frequency
             * self.state.n_planes,
-            GlobalState.PLANAR_PREVIEW: self.state.single_plane_settings.frequency,
         }
 
         expected_frame_rate = expected_frame_rate_dict[self.state.global_state]

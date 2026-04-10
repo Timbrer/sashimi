@@ -4,7 +4,6 @@ from sashimi.gui.calibration_gui import CalibrationWidget
 from sashimi.gui.scanning_gui import (
     PlanarScanningWidget,
     VolumeScanningWidget,
-    SinglePlaneScanningWidget,
 )
 from sashimi.gui.camera_gui import ViewingWidget, CameraSettingsWidget
 from sashimi.gui.save_gui import SaveWidget
@@ -87,7 +86,6 @@ class MainWindow(QMainWindow):
         self.wid_scan.wid_planar.refresh_widgets()
         self.wid_status.wid_volume.wid_volume.refresh_widgets()
         self.wid_status.wid_calibration.refresh_widgets()
-        self.wid_status.wid_single_plane.wid_singleplane.refresh_widgets()
         if not omit_wid_camera:
             self.wid_camera.wid_camera_settings.refresh_widgets()
             self.wid_camera.set_roi()
@@ -136,19 +134,16 @@ class StatusWidget(QTabWidget):
         self.option_dict = {
             0: "Paused",
             1: "Calibration",
-            2: "Planar",
-            3: "Volume",
+            2: "Volume",
         }
 
         self.wid_paused = PausedWidget()
         self.wid_calibration = CalibrationWidget(st, st.calibration, self.timer)
-        self.wid_single_plane = SinglePlaneScanningWidget(st)
         self.wid_volume = VolumeScanningWidget(st, self.timer)
 
         self.addTab(self.wid_paused, self.option_dict[0])
         self.addTab(self.wid_calibration, self.option_dict[1])
-        self.addTab(self.wid_single_plane, self.option_dict[2])
-        self.addTab(self.wid_volume, self.option_dict[3])
+        self.addTab(self.wid_volume, self.option_dict[2])
 
         # TODO: delete this line when single-plane scanning mode is implemented
         # self.setTabEnabled(2, False)

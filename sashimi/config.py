@@ -46,7 +46,6 @@ TEMPLATE_CONF_DICT = {
     "piezo": {
         "scale": 1 / 40,
     },
-    "email": {"user": "foo", "password": "foo"},
     "xy_board": {
         "write": {
             "channel": "Dev2/ao0:1",
@@ -61,8 +60,6 @@ TEMPLATE_CONF_DICT = {
         "default_exposure": 60,
         "default_binning": 1,
     },
-    "notifier": "none",
-    "notifier_options": {},
     "array_ram_MB": 450,
 }
 

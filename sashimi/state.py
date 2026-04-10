@@ -42,9 +42,8 @@ conf = read_config()
 class GlobalState(Enum):
     PAUSED = 0
     PREVIEW = 1
-    PLANAR_PREVIEW = 2
-    VOLUME_PREVIEW = 3
-    EXPERIMENT_RUNNING = 4
+    VOLUME_PREVIEW = 2
+    EXPERIMENT_RUNNING = 3
 
 
 class SaveSettings(ParametrizedQt):
@@ -52,7 +51,6 @@ class SaveSettings(ParametrizedQt):
         super().__init__()
         self.name = "experiment_settings"
         self.save_dir = Param(conf["default_paths"]["data"], gui=False)
-        self.notification_email = Param("")
         self.overwrite_save_folder = Param(0, (0, 1), gui=False, loadable=False)
 
 
@@ -69,14 +67,13 @@ class ScanningSettings(ParametrizedQt):
         self.name = "general/scanning_state"
         self.scanning_state = Param(
             "Paused",
-            ["Paused", "Calibration", "Planar", "Volume"],
+            ["Paused", "Calibration", "Volume"],
         )
 
 
 scanning_to_global_state = dict(
     Paused=GlobalState.PAUSED,
     Calibration=GlobalState.PREVIEW,
-    Planar=GlobalState.PLANAR_PREVIEW,
     Volume=GlobalState.VOLUME_PREVIEW,
 )
 
@@ -98,15 +95,6 @@ class CalibrationZSettings(ParametrizedQt):
         self.piezo = Param(200.0, (0.0, 400.0), unit="um", gui="slider")
         self.lateral = Param(0.0, (-2.0, 2.0), gui="slider")
         self.frontal = Param(0.0, (-2.0, 2.0), gui="slider")
-
-
-class SinglePlaneSettings(ParametrizedQt):
-    def __init__(self):
-        super().__init__()
-        self.name = "scanning/z_single_plane"
-        self.piezo = Param(200.0, (0.0, 400.0), unit="um", gui="slider")
-        self.frequency = Param(1.0, (0.1, 1000), unit="planes/s (Hz)")
-
 
 class ZRecordingSettings(ParametrizedQt):
     def __init__(self):
@@ -214,19 +202,16 @@ class Calibration(ParametrizedQt):
 
 
 def get_voxel_size(
-    scanning_settings: Union[ZRecordingSettings, SinglePlaneSettings],
+    scanning_settings: ZRecordingSettings,
     camera_settings: CameraSettings,
 ):
     binning = int(camera_settings.binning)
 
-    if isinstance(scanning_settings, SinglePlaneSettings):
-        inter_plane = 1
-    else:
-        scan_length = (
-            scanning_settings.piezo_scan_range[1]
-            - scanning_settings.piezo_scan_range[0]
-        )
-        inter_plane = scan_length / scanning_settings.n_planes
+    scan_length = (
+        scanning_settings.piezo_scan_range[1]
+        - scanning_settings.piezo_scan_range[0]
+    )
+    inter_plane = scan_length / scanning_settings.n_planes
 
     return (
         inter_plane,
@@ -237,45 +222,23 @@ def get_voxel_size(
 
 def convert_save_params(
     save_settings: SaveSettings,
-    scanning_settings: Union[ZRecordingSettings, SinglePlaneSettings],
+    scanning_settings: ZRecordingSettings,
     camera_settings: CameraSettings,
     trigger_settings: TriggerSettings,
 ):
-    if isinstance(scanning_settings, SinglePlaneSettings):
-        n_planes = 0
-    else:
-        n_planes = scanning_settings.n_planes - (
-            scanning_settings.n_skip_start + scanning_settings.n_skip_end
-        )
+    n_planes = scanning_settings.n_planes - (
+        scanning_settings.n_skip_start + scanning_settings.n_skip_end
+    )
 
     return SavingParameters(
         output_dir=Path(save_settings.save_dir),
         n_planes=n_planes,
-        notification_email=str(save_settings.notification_email),
         volumerate=scanning_settings.frequency,
         voxel_size=get_voxel_size(scanning_settings, camera_settings),
         crop=[
             int(item) for item in camera_settings.roi
         ],  # int conversion makes it json serializable
     )
-
-
-def convert_single_plane_params(
-    planar: PlanarScanningSettings,
-    single_plane_setting: SinglePlaneSettings,
-    calibration: Calibration,
-):
-    return ScanParameters(
-        state=ScanningState.PLANAR,
-        xy=convert_planar_params(planar),
-        z=ZSynced(
-            piezo=single_plane_setting.piezo,
-            lateral_sync=tuple(calibration.calibration[0]),
-            frontal_sync=tuple(calibration.calibration[1]),
-        ),
-        triggering=TriggeringParameters(frequency=single_plane_setting.frequency),
-    )
-
 
 def convert_volume_params(
     planar: PlanarScanningSettings,
@@ -375,13 +338,11 @@ class State:
 
         self.save_status: Optional[SavingStatus] = None
 
-        self.single_plane_settings = SinglePlaneSettings()
         self.volume_setting = ZRecordingSettings()
         self.calibration = Calibration()
 
         for setting in [
             self.planar_setting,
-            self.single_plane_settings,
             self.volume_setting,
             self.calibration,
             self.calibration.z_settings,
@@ -394,7 +355,6 @@ class State:
 
         self.planar_setting.sig_param_changed.connect(self.send_scansave_settings)
         self.calibration.z_settings.sig_param_changed.connect(self.send_scan_settings)
-        self.single_plane_settings.sig_param_changed.connect(self.send_scan_settings)
         self.volume_setting.sig_param_changed.connect(self.send_scan_settings)
 
         self.save_settings.sig_param_changed.connect(self.send_scansave_settings)
@@ -447,20 +407,12 @@ class State:
 
     @property
     def save_params(self):
-        if self.global_state == GlobalState.PLANAR_PREVIEW:
-            save_p = convert_save_params(
-                self.save_settings,
-                self.single_plane_settings,
-                self.camera_settings,
-                self.trigger_settings,
-            )
-        else:
-            save_p = convert_save_params(
-                self.save_settings,
-                self.volume_setting,
-                self.camera_settings,
-                self.trigger_settings,
-            )
+        save_p = convert_save_params(
+            self.save_settings,
+            self.volume_setting,
+            self.camera_settings,
+            self.trigger_settings,
+        )
         return save_p
 
     @property
@@ -472,13 +424,6 @@ class State:
         elif self.global_state == GlobalState.PREVIEW:
             params = convert_calibration_params(
                 self.planar_setting, self.calibration.z_settings
-            )
-
-        elif self.global_state == GlobalState.PLANAR_PREVIEW:
-            params = convert_single_plane_params(
-                self.planar_setting,
-                self.single_plane_settings,
-                self.calibration,
             )
 
         elif self.global_state == GlobalState.VOLUME_PREVIEW:
@@ -502,7 +447,6 @@ class State:
         camera_params.trigger_mode = (
             TriggerMode.FREE
             if self.global_state == GlobalState.PREVIEW
-            or self.global_state == GlobalState.PLANAR_PREVIEW
             else TriggerMode.EXTERNAL_TRIGGER
         )
         if self.global_state == GlobalState.PAUSED:
