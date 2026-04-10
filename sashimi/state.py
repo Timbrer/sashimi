@@ -4,10 +4,8 @@ from queue import Empty
 from typing import Optional
 from lightparam.param_qt import ParametrizedQt
 from lightparam import Param, ParameterTree
-from sashimi.hardware.light_source import light_source_class_dict
 from typing import Union
 
-# from sashimi.hardware import light_source_class_dict
 from sashimi.processes.scanning import ScannerProcess
 from sashimi.hardware.scanning.scanloops import (
     ScanningState,
@@ -140,13 +138,6 @@ class CameraSettings(ParametrizedQt):
         self.roi = Param(
             roi_size, gui=False
         )  # order of params here is [hpos, vpos, hsize, vsize,]; h: horizontal, v: vertical
-
-
-class LightSourceSettings(ParametrizedQt):
-    def __init__(self):
-        super().__init__()
-        self.name = "general/light_source"
-        self.intensity = Param(0, (0, 40), unit=conf["light_source"]["intensity_units"])
 
 
 def convert_planar_params(planar: PlanarScanningSettings):
@@ -352,12 +343,6 @@ class State:
         self.settings_tree = ParameterTree()
 
         self.pause_after = False
-        if self.conf["scopeless"]:
-            self.light_source = light_source_class_dict["mock"]()
-        else:
-            self.light_source = light_source_class_dict[conf["light_source"]["name"]](
-                port=conf["light_source"]["port"]
-            )
         self.camera = CameraProcess(
             stop_event=self.stop_event,
             wait_event=self.scanner.wait_signal,
@@ -401,10 +386,6 @@ class State:
         self.prev_exp_state = self.current_exp_state
 
         self.planar_setting = PlanarScanningSettings()
-        self.light_source_settings = LightSourceSettings()
-        self.light_source_settings.params.intensity.unit = (
-            self.light_source.intensity_units
-        )
 
         self.save_status: Optional[SavingStatus] = None
 
@@ -414,7 +395,6 @@ class State:
 
         for setting in [
             self.planar_setting,
-            self.light_source_settings,
             self.single_plane_settings,
             self.volume_setting,
             self.calibration,
@@ -646,8 +626,6 @@ class State:
         """
         self.noise_subtraction_active.clear()
 
-        light_intensity = self.light_source_settings.intensity
-        self.light_source.intensity = 0
         n_image = 0
         while n_image < n_images:
             current_volume = self.get_volume()
@@ -664,7 +642,6 @@ class State:
         self.calibration_ref = np.mean(calibration_set, axis=0).astype(
             dtype=current_volume.dtype
         )
-        self.light_source.intensity = light_intensity
 
         self.noise_subtraction_active.set()
 
@@ -707,7 +684,6 @@ class State:
 
     def wrap_up(self):
         self.stop_event.set()
-        self.light_source.close()
 
         self.scanner.join(timeout=10)
         self.saver.join(timeout=10)

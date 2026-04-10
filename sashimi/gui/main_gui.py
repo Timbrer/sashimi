@@ -6,7 +6,6 @@ from sashimi.gui.scanning_gui import (
     VolumeScanningWidget,
     SinglePlaneScanningWidget,
 )
-from sashimi.gui.light_source_gui import LightSourceWidget
 from sashimi.gui.save_settings_gui import SavingSettingsWidget
 from sashimi.gui.camera_gui import ViewingWidget, CameraSettingsWidget
 from sashimi.gui.save_gui import SaveWidget
@@ -40,7 +39,6 @@ class MainWindow(QMainWindow):
         self.wid_status = StatusWidget(st, self.timer)
         self.wid_display = ViewingWidget(st, self.timer, style)
         self.wid_save_options = SaveWidget(st, self.timer)
-        self.wid_laser = LightSourceWidget(st, self.timer)
         self.wid_scan = PlanarScanningWidget(st)
         self.wid_camera = CameraSettingsWidget(st, self.wid_display, self.timer)
         self.wid_status_bar = StatusBarWidget(st, self.timer)
@@ -60,10 +58,6 @@ class MainWindow(QMainWindow):
             DockedWidget(widget=self.wid_scan, title="Scanning settings"),
         )
 
-        self.addDockWidget(
-            Qt.RightDockWidgetArea,
-            DockedWidget(widget=self.wid_laser, title="Light source"),
-        )
 
         self.addDockWidget(
             Qt.RightDockWidgetArea,
@@ -119,7 +113,6 @@ class MainWindow(QMainWindow):
 
     def refresh_param_values(self, omit_wid_camera=False):
         # TODO should be possible with lightparam, when it's implemented there remove here
-        self.wid_laser.wid_settings.refresh_widgets()
         self.wid_scan.wid_planar.refresh_widgets()
         self.wid_status.wid_volume.wid_volume.refresh_widgets()
         self.wid_status.wid_calibration.refresh_widgets()
@@ -136,7 +129,6 @@ class MainWindow(QMainWindow):
             self.st.end_experiment()
             if self.st.pause_after:
                 self.wid_status.setCurrentIndex(0)
-                self.wid_laser.btn_off.click()
             self.refresh_param_values(omit_wid_camera=True)
             self.toolbar.experiment_progress.hide()
             self.toolbar.lbl_experiment_progress.hide()
@@ -160,7 +152,6 @@ class MainWindow(QMainWindow):
         and re-enables them after
         """
         self.menuBar().setEnabled(enable)
-        self.wid_laser.setEnabled(enable)
         self.wid_status.setEnabled(enable)
         self.wid_scan.setEnabled(enable)
         self.wid_camera.setEnabled(enable)

@@ -1,12 +1,19 @@
 from PyQt5.QtWidgets import QApplication
 import qdarkstyle
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message=r".*Public access to Window\.qt_viewer is deprecated.*",
+)
+
 from sashimi.gui.main_gui import MainWindow
 from PyQt5.QtGui import QIcon
 import click
 from sashimi.config import cli_edit_config
 from sashimi.state import State
 from pathlib import Path
-
 
 @click.command()
 @click.option("--scopeless", is_flag=True, help="Scopeless mode for simulated hardware")

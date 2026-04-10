@@ -190,9 +190,6 @@ class ViewingWidget(QWidget):
         self.state.camera_settings.sig_param_changed.connect(
             self.launch_delayed_contrast_reset
         )
-        self.state.light_source_settings.sig_param_changed.connect(
-            self.launch_delayed_contrast_reset
-        )
         self.viewer.window.qt_viewer.viewerButtons.resetViewButton.pressed.connect(
             self.reset_contrast
         )
