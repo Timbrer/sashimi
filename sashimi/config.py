@@ -61,7 +61,6 @@ TEMPLATE_CONF_DICT = {
         "default_exposure": 60,
         "default_binning": 1,
     },
-    "external_communication": {"name": "stytra", "address": "tcp://O1-589:5555"},
     "notifier": "none",
     "notifier_options": {},
     "array_ram_MB": 450,

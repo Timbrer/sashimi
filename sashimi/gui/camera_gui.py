@@ -46,7 +46,7 @@ class ContrastSettings(ParametrizedQt):
     def __init__(self):
         super().__init__(self)
         self.name = "image_contrast"
-        self.contrast_range = Param((0, 2000), (-50, 5000))
+        self.contrast_range = Param((0, 20000), (-50, 65536))
 
 
 class ViewingWidget(QWidget):
@@ -238,9 +238,6 @@ class ViewingWidget(QWidget):
         if current_image is None:
             return
 
-        # If not volumetric or out of range, reset indexes:
-        if current_image.shape[0] == 1:
-            self.viewer.dims.reset()
         self.frame_layer.data = current_image
         # self.frame_layer.scale = [self.voxel_size[0] / self.voxel_size[1], 1.0, 1.0]
 
@@ -255,6 +252,9 @@ class ViewingWidget(QWidget):
         # Check if anything changed in the image shape, which would mean that changes of the contrast
         # are required (in case a parameter update was missed).
         if self.is_first_frame or self.image_shape != current_image.shape:
+            # If not volumetric or out of range, reset indexes:
+            if current_image.shape[0] == 1:
+                self.viewer.dims.reset()
             self.reset_contrast()
             self.viewer.reset_view()
 

@@ -18,7 +18,6 @@ from sashimi.hardware.scanning.scanloops import (
     TriggeringParameters,
     ScanParameters,
 )
-from sashimi.processes.external_communication import ExternalComm
 from sashimi.processes.dispatcher import VolumeDispatcher
 from sashimi.processes.logging import ConcurrenceLogger
 from multiprocessing import Event
@@ -62,7 +61,6 @@ class TriggerSettings(ParametrizedQt):
         super().__init__(self)
         self.name = "trigger_settings"
         self.experiment_duration = Param(5, (1, 50_000), unit="s")
-        self.is_triggered = Param(True, [True, False], gui=False)
 
 
 class ScanningSettings(ParametrizedQt):
@@ -315,9 +313,6 @@ class State:
         self.current_plane = 0
         self.stop_event = LoggedEvent(self.logger, SashimiEvents.CLOSE_ALL)
         self.restart_event = LoggedEvent(self.logger, SashimiEvents.RESTART_SCANNING)
-        self.experiment_start_event = LoggedEvent(
-            self.logger, SashimiEvents.SEND_EXT_TRIGGER
-        )
         self.noise_subtraction_active = LoggedEvent(
             self.logger, SashimiEvents.NOISE_SUBTRACTION_ACTIVE, Event()
         )
@@ -346,20 +341,12 @@ class State:
         self.camera = CameraProcess(
             stop_event=self.stop_event,
             wait_event=self.scanner.wait_signal,
-            exp_trigger_event=self.experiment_start_event,
         )
 
         self.multiprocessing_manager = MultiprocessingManager()
 
         self.experiment_duration_queue = self.multiprocessing_manager.Queue()
 
-        self.external_comm = ExternalComm(
-            stop_event=self.stop_event,
-            experiment_start_event=self.experiment_start_event,
-            is_saving_event=self.is_saving_event,
-            is_waiting_event=self.is_waiting_event,
-            duration_queue=self.experiment_duration_queue,
-        )
 
         self.saver = StackSaver(
             stop_event=self.stop_event,
@@ -415,7 +402,6 @@ class State:
 
         self.camera.start()
         self.scanner.start()
-        self.external_comm.start()
         self.saver.start()
         self.dispatcher.start()
 
@@ -547,7 +533,6 @@ class State:
             self.current_plane = min(self.current_plane, self.n_planes - 1)
 
         self.scanner.parameter_queue.put(self.scan_params)
-        self.external_comm.current_settings_queue.put(self.all_settings)
 
         self.voxel_size = get_voxel_size(self.volume_setting, self.camera_settings)
         self.saver.saving_parameter_queue.put(self.save_params)
@@ -562,6 +547,7 @@ class State:
         self.logger.log_message("started experiment")
         self.scanner.wait_signal.set()
         self.send_scansave_settings()
+        self.send_manual_duration()
         self.restart_event.set()
         self.saver.save_queue.empty()
         self.camera.image_queue.empty()
@@ -575,7 +561,6 @@ class State:
         """
         self.logger.log_message("experiment ended")
         self.is_saving_event.clear()
-        self.experiment_start_event.clear()
         self.saver.save_queue.clear()
         self.send_scansave_settings()
         self.current_exp_state = GlobalState.PAUSED
@@ -673,12 +658,6 @@ class State:
             self.volume_setting.n_planes - self.volume_setting.n_skip_end,
         ) / (self.volume_setting.frequency * self.volume_setting.n_planes)
 
-    def set_trigger_mode(self, mode: bool):
-        if mode:
-            self.external_comm.is_triggered_event.set()
-        else:
-            self.external_comm.is_triggered_event.clear()
-
     def send_manual_duration(self):
         self.experiment_duration_queue.put(self.trigger_settings.experiment_duration)
 
@@ -688,6 +667,5 @@ class State:
         self.scanner.join(timeout=10)
         self.saver.join(timeout=10)
         self.camera.join(timeout=10)
-        self.external_comm.join(timeout=10)
         self.dispatcher.join(timeout=10)
         self.logger.close()

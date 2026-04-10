@@ -10,7 +10,6 @@ class AutoName(Enum):
 
 class SashimiEvents(AutoName):
     WAITING_FOR_TRIGGER = auto()
-    SEND_EXT_TRIGGER = auto()
     IS_SAVING = auto()
     NOISE_SUBTRACTION_ACTIVE = auto()
     SAVING_STOPPED = auto()

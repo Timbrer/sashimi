@@ -6,7 +6,6 @@ from sashimi.gui.scanning_gui import (
     VolumeScanningWidget,
     SinglePlaneScanningWidget,
 )
-from sashimi.gui.save_settings_gui import SavingSettingsWidget
 from sashimi.gui.camera_gui import ViewingWidget, CameraSettingsWidget
 from sashimi.gui.save_gui import SaveWidget
 from sashimi.gui.status_bar import StatusBarWidget
@@ -32,9 +31,6 @@ class MainWindow(QMainWindow):
         self.st = st
         self.timer = QTimer()
         self.showMaximized()
-
-        self.wid_settings_tree = SavingSettingsWidget(st)
-        self.wid_settings_tree.sig_params_loaded.connect(self.refresh_param_values)
 
         self.wid_status = StatusWidget(st, self.timer)
         self.wid_display = ViewingWidget(st, self.timer, style)
@@ -78,36 +74,11 @@ class MainWindow(QMainWindow):
 
         self.timer.start()
         self.timer.timeout.connect(self.check_end_experiment)
-        self.setup_menu_bar()
 
         self.refresh_param_values()
 
-    def setup_menu_bar(self):
-        menubar = self.menuBar()
-
-        file_menu = menubar.addMenu("File")
-        load = file_menu.addAction("Load presets")
-        save_settings = file_menu.addAction("Save presets")
-        exit = file_menu.addAction("Exit")
-        load.triggered.connect(self.wid_settings_tree.load)
-        save_settings.triggered.connect(self.wid_settings_tree.save)
-        exit.triggered.connect(self.close)
-
-        edit_menu = menubar.addMenu("Edit")
-        edit_config = edit_menu.addAction("Configure")
-        edit_guide = edit_menu.addAction("Edit user guide")
-        edit_guide.triggered.connect(self.wid_settings_tree.edit_guide)
-        edit_config.triggered.connect(self.wid_settings_tree.edit_config)
-
-        help_menu = menubar.addMenu("Help")
-        instructions = help_menu.addAction("User guide")
-        docs = help_menu.addAction("About")
-        instructions.triggered.connect(self.wid_settings_tree.show_instructions)
-        docs.triggered.connect(self.wid_settings_tree.open_docs)
 
     def closeEvent(self, a0) -> None:
-        self.wid_settings_tree.conf_window.close()
-        self.wid_settings_tree.guide_window.close()
         self.st.wrap_up()
         a0.accept()
 
