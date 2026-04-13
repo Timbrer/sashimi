@@ -6,52 +6,43 @@ from lightparam import set_nested, get_nested
 CONFIG_FILENAME = "hardware_config.toml"
 CONFIG_DIR_PATH = Path.home() / ".sashimi"
 CONFIG_DIR_PATH.mkdir(exist_ok=True)
-PRESETS_DIR_PATH = Path.home() / "presets"
-PRESETS_DIR_PATH.mkdir(exist_ok=True)
 LOGS_DIR_PATH = Path.home() / "logs"
 LOGS_DIR_PATH.mkdir(exist_ok=True)
-SCOPE_INSTRUCTIONS_PATH = Path()
 
 CONFIG_PATH = CONFIG_DIR_PATH / CONFIG_FILENAME
 
 # 2 level dictionary for sections and values:
-# TODO this will obviously have to change to fit scanning declarations
 TEMPLATE_CONF_DICT = {
     "scanning": "mock",
     "scopeless": False,
     "sample_rate": 40000,
     "voxel_size": {
-        "x": 0.3,
-        "y": 0.3,
+        "x": 0.252,
+        "y": 0.252,
     },
     "default_paths": {
         "data": str(Path.home()),
-        "presets": str(PRESETS_DIR_PATH),
         "log": str(LOGS_DIR_PATH),
-        "scope_instructions": str(SCOPE_INSTRUCTIONS_PATH),
     },
-    "z_board": {
+    "scan_board": {
         "read": {
             "channel": "Dev1/ai0:0",
             "min_val": 0,
             "max_val": 10,
         },
         "write": {
-            "channel": "Dev1/ao0:3",
-            "min_val": -5,
-            "max_val": 10,
+            "names": ["xy_galvo", "z_galvo", "piezo", "camera_trigger"],
+            "channels": ["Dev1/ao0", "Dev1/ao1", "Dev1/ao2", "Dev1/ao3"],
+            "min_vals": [-5, -5, 0, 0],
+            "max_vals": [5, 5, 10, 5],
         },
-        "sync": {"channel": "/Dev1/ao/StartTrigger"},
+        "sync": {
+        "start_trigger": "/Dev1/ao/StartTrigger",
+        "sample_clock": "/Dev1/ao/SampleClock",
+        }
     },
     "piezo": {
-        "scale": 1 / 40,
-    },
-    "xy_board": {
-        "write": {
-            "channel": "Dev2/ao0:1",
-            "min_val": -5,
-            "max_val": 10,
-        }
+        "scale": 1 / 45,
     },
     "camera": {
         "id": 0,
@@ -65,37 +56,11 @@ TEMPLATE_CONF_DICT = {
 
 
 def write_default_config(file_path=CONFIG_PATH, template=TEMPLATE_CONF_DICT):
-    """Write configuration file at first repo usage. In this way,
-    we don't need to keep a confusing template config file in the repo.
-
-    Parameters
-    ----------
-    file_path : Path object
-        Path of the config file (optional).
-    template : dict
-        Template of the config file to be written (optional).
-
-    """
-
     with open(file_path, "w") as f:
         toml.dump(template, f)
 
 
 def read_config(file_path=CONFIG_PATH):
-    """Read Sashimi config.
-
-    Parameters
-    ----------
-    file_path : Path object
-        Path of the config file (optional).
-
-    Returns
-    -------
-    ConfigParser object
-        sashimi configuration
-    """
-
-    # If no config file exists yet, write the default one:
     if not file_path.exists():
         write_default_config()
 

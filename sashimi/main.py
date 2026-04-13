@@ -22,7 +22,6 @@ def main(scopeless, scanning, **kwargs):
     cli_edit_config("scopeless", scopeless)
     cli_edit_config("scanning", scanning)
 
-    # TODO configure logging with CLI
 
     app = QApplication([])
     style = qdarkstyle.load_stylesheet_pyqt5()

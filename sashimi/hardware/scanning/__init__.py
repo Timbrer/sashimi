@@ -26,32 +26,22 @@ class AbstractScanInterface(ABC):
 
     @property
     @abstractmethod
-    def z_piezo(self):
+    def piezo(self):
         return None
 
-    @z_piezo.setter
+    @piezo.setter
     @abstractmethod
-    def z_piezo(self, waveform):
+    def piezo(self, waveform):
         pass
 
     @property
     @abstractmethod
-    def z_frontal(self):
+    def z_galvo(self):
         return None
 
-    @z_frontal.setter
+    @z_galvo.setter
     @abstractmethod
-    def z_frontal(self, waveform):
-        pass
-
-    @property
-    @abstractmethod
-    def z_lateral(self):
-        return None
-
-    @z_lateral.setter
-    @abstractmethod
-    def z_lateral(self, waveform):
+    def z_galvo(self, waveform):
         pass
 
     @property
@@ -66,24 +56,13 @@ class AbstractScanInterface(ABC):
 
     @property
     @abstractmethod
-    def xy_frontal(self):
+    def xy_galvo(self):
         return None
 
-    @xy_frontal.setter
+    @xy_galvo.setter
     @abstractmethod
-    def xy_frontal(self, waveform):
+    def xy_galvo(self, waveform):
         pass
-
-    @property
-    @abstractmethod
-    def xy_lateral(self):
-        return None
-
-    @xy_lateral.setter
-    @abstractmethod
-    def xy_lateral(self, waveform):
-        pass
-
 
 @contextmanager
 def open_abstract_interface(sample_rate, n_samples, conf) -> AbstractScanInterface:

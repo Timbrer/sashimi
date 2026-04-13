@@ -19,28 +19,20 @@ class MockBoard(AbstractScanInterface):
         sleep(0.05)
 
     @property
-    def z_piezo(self):
+    def piezo(self):
         len_sampling = len(self.piezo_array)
         return np.ones(len_sampling)
 
-    @z_piezo.setter
-    def z_piezo(self, waveform):
+    @piezo.setter
+    def piezo(self, waveform):
         self.piezo_array[:] = waveform
 
     @property
-    def z_frontal(self):
+    def z_galvo(self):
         return None
 
-    @z_frontal.setter
-    def z_frontal(self, waveform):
-        pass
-
-    @property
-    def z_lateral(self):
-        return None
-
-    @z_lateral.setter
-    def z_lateral(self, waveform):
+    @z_galvo.setter
+    def z_galvo(self, waveform):
         pass
 
     @property
@@ -52,21 +44,12 @@ class MockBoard(AbstractScanInterface):
         pass
 
     @property
-    def xy_frontal(self):
+    def xy_galvo(self):
         return None
 
-    @xy_frontal.setter
-    def xy_frontal(self, waveform):
+    @xy_galvo.setter
+    def xy_galvo(self, waveform):
         pass
-
-    @property
-    def xy_lateral(self):
-        return None
-
-    @xy_lateral.setter
-    def xy_lateral(self, waveform):
-        pass
-
 
 @contextmanager
 def open_mockboard(sample_rate, n_samples, conf) -> MockBoard:

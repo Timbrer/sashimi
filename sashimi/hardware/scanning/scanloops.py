@@ -40,22 +40,19 @@ class XYScanning:
 
 @dataclass
 class PlanarScanning:
-    lateral: XYScanning = XYScanning()
-    frontal: XYScanning = XYScanning()
+    galvo: XYScanning = XYScanning()
 
 
 @dataclass
 class ZManual:
     piezo: float = 0
-    lateral: float = 0
-    frontal: float = 0
+    galvo: float = 0
 
 
 @dataclass
 class ZSynced:
     piezo: float = 0
-    lateral_sync: Tuple[float, float] = (0.0, 0.0)
-    frontal_sync: Tuple[float, float] = (0.0, 0.0)
+    galvo_sync: Tuple[float, float] = (0.0, 0.0)
 
 
 @dataclass
@@ -63,8 +60,7 @@ class ZScanning:
     piezo_min: float = 0
     piezo_max: float = 0
     frequency: float = 1
-    lateral_sync: Tuple[float, float] = (0.0, 0.0)
-    frontal_sync: Tuple[float, float] = (0.0, 0.0)
+    galvo_sync: Tuple[float, float] = (0.0, 0.0)
 
 
 @dataclass
@@ -133,8 +129,7 @@ class ScanLoop:
         self.i_sample = 0
         self.n_samples_read = 0
 
-        self.lateral_waveform = TriangleWaveform(**asdict(self.parameters.xy.lateral))
-        self.frontal_waveform = TriangleWaveform(**asdict(self.parameters.xy.lateral))
+        self.xy_waveform = TriangleWaveform(**asdict(self.parameters.xy.galvo))
 
         self.time = np.arange(self.n_samples) / self.sample_rate
         self.shifted_time = self.time.copy()
@@ -148,9 +143,7 @@ class ScanLoop:
         self.n_samples_read = 0
 
     def n_samples_period(self):
-        ns_lateral = int(round(self.sample_rate / self.lateral_waveform.frequency))
-        ns_frontal = int(round(self.sample_rate / self.frontal_waveform.frequency))
-        return lcm(ns_lateral, ns_frontal)
+        return int(round(self.sample_rate / self.xy_waveform.frequency))
 
     def update_settings(self):
         """Update parameters and return True only if got new parameters."""
@@ -159,8 +152,7 @@ class ScanLoop:
             return False
 
         self.parameters = new_params
-        self.lateral_waveform = TriangleWaveform(**asdict(self.parameters.xy.lateral))
-        self.frontal_waveform = TriangleWaveform(**asdict(self.parameters.xy.frontal))
+        self.xy_waveform = TriangleWaveform(**asdict(self.parameters.xy.galvo))
         self.first_update = False  # To avoid multiple updates
         return True
 
@@ -182,8 +174,7 @@ class ScanLoop:
 
     def fill_arrays(self):
         self.shifted_time[:] = self.time + self.i_sample / self.sample_rate
-        self.board.xy_lateral = self.lateral_waveform.values(self.shifted_time)
-        self.board.xy_frontal = self.frontal_waveform.values(self.shifted_time)
+        self.board.xy_galvo = self.xy_waveform.values(self.shifted_time)
 
     def write(self):
         self.board.write()
@@ -241,16 +232,12 @@ class PlanarScanLoop(ScanLoop):
 
     def fill_arrays(self):
         # Fill the z values
-        self.board.z_piezo = self.parameters.z.piezo
+        self.board.piezo = self.parameters.z.piezo
         if isinstance(self.parameters.z, ZManual):
-            self.board.z_lateral = self.parameters.z.lateral
-            self.board.z_frontal = self.parameters.z.frontal
+            self.board.z_galvo = self.parameters.z.galvo
         elif isinstance(self.parameters.z, ZSynced):
-            self.board.z_lateral = calc_sync(
-                self.parameters.z.piezo, self.parameters.z.lateral_sync
-            )
-            self.board.z_frontal = calc_sync(
-                self.parameters.z.piezo, self.parameters.z.frontal_sync
+            self.board.z_galvo = calc_sync(
+                self.parameters.z.piezo, self.parameters.z.galvo_sync
             )
         super().fill_arrays()
 
@@ -332,8 +319,8 @@ class VolumetricScanLoop(ScanLoop):
         super().read()
         i_insert = (self.i_sample - self.n_samples) % len(self.recorded_signal.buffer)
         self.recorded_signal.write(
-            self.board.z_piezo[
-                : min(len(self.recorded_signal.buffer), len(self.board.z_piezo))
+            self.board.piezo[
+                : min(len(self.recorded_signal.buffer), len(self.board.piezo))
             ],
             i_insert,
         )
@@ -341,25 +328,18 @@ class VolumetricScanLoop(ScanLoop):
 
     def fill_arrays(self):
         super().fill_arrays()
-        self.board.z_piezo = self.z_waveform.values(self.shifted_time)
+        self.board.piezo = self.z_waveform.values(self.shifted_time)
         i_sample = self.i_sample % len(self.recorded_signal.buffer)
 
         if self.recorded_signal.is_complete():
             wave_part = self.recorded_signal.read(i_sample, self.n_samples)
             max_wave, min_wave = (np.max(wave_part), np.min(wave_part))
             if (
-                -2 < calc_sync(min_wave, self.parameters.z.lateral_sync) < 2
-                and -2 < calc_sync(max_wave, self.parameters.z.lateral_sync) < 2
+                -2 < calc_sync(min_wave, self.parameters.z.galvo_sync) < 2
+                and -2 < calc_sync(max_wave, self.parameters.z.galvo_sync) < 2
             ):
-                self.board.z_lateral = calc_sync(
-                    wave_part, self.parameters.z.lateral_sync
-                )
-            if (
-                -2 < calc_sync(min_wave, self.parameters.z.frontal_sync) < 2
-                and -2 < calc_sync(max_wave, self.parameters.z.frontal_sync) < 2
-            ):
-                self.board.z_frontal = calc_sync(
-                    wave_part, self.parameters.z.frontal_sync
+                self.board.z_galvo = calc_sync(
+                    wave_part, self.parameters.z.galvo_sync
                 )
 
         camera_pulses = 0

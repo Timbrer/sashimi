@@ -70,17 +70,16 @@ class CalibrationWidget(QWidget):
         self.lbl_calibration.setText(
             "\n".join(
                 [
-                    "piezo: {:0.2f} lat. galvo: {:0.2f} front. galvo {:0.2f}".format(
-                        *pt
-                    )
+                    "piezo: {:0.2f} galvo: {:0.2f}".format(*pt)
                     for pt in self.calibration_state.calibrations_points
                 ]
                 + (
                     ["not enough points"]
                     if self.calibration_state.calibration is None
                     else [
-                        "offset: {:0.5f} amplitude {:0.5f}".format(*list(calib_row))
-                        for calib_row in self.calibration_state.calibration
+                        "offset: {:0.5f} amplitude {:0.5f}".format(
+                            *list(self.calibration_state.calibration[0])
+                        )
                     ]
                 )
             )

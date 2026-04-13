@@ -82,19 +82,16 @@ class PlanarScanningSettings(ParametrizedQt):
     def __init__(self):
         super().__init__()
         self.name = "scanning/planar_scanning"
-        self.lateral_range = Param((0, 0.5), (-2, 2))
-        self.lateral_frequency = Param(500.0, (10, 1000), unit="Hz")
-        self.frontal_range = Param((0, 0.5), (-2, 2))
-        self.frontal_frequency = Param(500.0, (10, 1000), unit="Hz")
+        self.range = Param((-0.5, 0.5), (-2, 2))
+        self.frequency = Param(500.0, (10, 1000), unit="Hz")
 
 
 class CalibrationZSettings(ParametrizedQt):
     def __init__(self):
         super().__init__()
         self.name = "scanning/z_manual"
-        self.piezo = Param(200.0, (0.0, 400.0), unit="um", gui="slider")
-        self.lateral = Param(0.0, (-2.0, 2.0), gui="slider")
-        self.frontal = Param(0.0, (-2.0, 2.0), gui="slider")
+        self.piezo = Param(225.0, (0.0, 450.0), unit="um", gui="slider")
+        self.galvo = Param(0.0, (-2.0, 2.0), gui="slider")
 
 class ZRecordingSettings(ParametrizedQt):
     def __init__(self):
@@ -128,16 +125,11 @@ class CameraSettings(ParametrizedQt):
 
 def convert_planar_params(planar: PlanarScanningSettings):
     return PlanarScanning(
-        lateral=XYScanning(
-            vmin=planar.lateral_range[0],
-            vmax=planar.lateral_range[1],
-            frequency=planar.lateral_frequency,
-        ),
-        frontal=XYScanning(
-            vmin=planar.frontal_range[0],
-            vmax=planar.frontal_range[1],
-            frequency=planar.frontal_frequency,
-        ),
+        galvo=XYScanning(
+            vmin=planar.range[0],
+            vmax=planar.range[1],
+            frequency=planar.frequency,
+        )
     )
 
 
@@ -158,14 +150,13 @@ class Calibration(ParametrizedQt):
         self.name = "general/calibration"
         self.z_settings = CalibrationZSettings()
         self.calibrations_points = []
-        self.calibration = Param([(0, 0.01), (0, 0.01)], gui=False)
+        self.calibration = Param([(0, 0.01)], gui=False)
 
     def add_calibration_point(self):
         self.calibrations_points.append(
             (
                 self.z_settings.piezo,
-                self.z_settings.lateral,
-                self.z_settings.frontal,
+                self.z_settings.galvo,
             )
         )
         self.calculate_calibration()
@@ -187,15 +178,13 @@ class Calibration(ParametrizedQt):
             constant_values=1.0,
             mode="constant",
         )
-        lateral_val = calibration_data[:, 1]
-        frontal_val = calibration_data[:, 2]
+        galvo_val = calibration_data[:, 1]
 
         # solve least squares according to standard formula b = (XtX)^-1 * Xt * y
         piezo_cor = np.linalg.pinv(piezo_val.T @ piezo_val)
 
         self.calibration = [
-            tuple(piezo_cor @ piezo_val.T @ galvo)
-            for galvo in [lateral_val, frontal_val]
+            tuple(piezo_cor @ piezo_val.T @ galvo_val)
         ]
 
         return True
@@ -252,8 +241,7 @@ def convert_volume_params(
             piezo_min=z_setting.piezo_scan_range[0],
             piezo_max=z_setting.piezo_scan_range[1],
             frequency=z_setting.frequency,
-            lateral_sync=tuple(calibration.calibration[0]),
-            frontal_sync=tuple(calibration.calibration[1]),
+            galvo_sync=tuple(calibration.calibration[0]),
         ),
         triggering=TriggeringParameters(
             n_planes=z_setting.n_planes,
