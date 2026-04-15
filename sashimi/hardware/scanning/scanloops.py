@@ -50,12 +50,6 @@ class ZManual:
 
 
 @dataclass
-class ZSynced:
-    piezo: float = 0
-    galvo_sync: Tuple[float, float] = (0.0, 0.0)
-
-
-@dataclass
 class ZScanning:
     piezo_min: float = 0
     piezo_max: float = 0
@@ -75,7 +69,7 @@ class TriggeringParameters:
 class ScanParameters:
     state: ScanningState = ScanningState.PAUSED
     experiment_state: ExperimentPrepareState = ExperimentPrepareState.PREVIEW
-    z: Union[ZScanning, ZManual, ZSynced] = ZManual()
+    z: Union[ZScanning, ZManual] = ZManual()
     xy: PlanarScanning = PlanarScanning()
     triggering: TriggeringParameters = TriggeringParameters()
 
@@ -235,10 +229,6 @@ class PlanarScanLoop(ScanLoop):
         self.board.piezo = self.parameters.z.piezo
         if isinstance(self.parameters.z, ZManual):
             self.board.z_galvo = self.parameters.z.galvo
-        elif isinstance(self.parameters.z, ZSynced):
-            self.board.z_galvo = calc_sync(
-                self.parameters.z.piezo, self.parameters.z.galvo_sync
-            )
         super().fill_arrays()
 
         self.wait_signal.clear()

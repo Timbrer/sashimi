@@ -39,7 +39,7 @@ class CamParameters:
         0,
         FULL_SIZE[0],
         FULL_SIZE[1],
-    )  # order is [hpos, vpos, hsize, vsize]
+    )  # order is [vpos, hpos, vsize, hsize]
     image_height: int = FULL_SIZE[0]
     image_width: int = FULL_SIZE[1]
     frame_shape: tuple = (FULL_SIZE[0], FULL_SIZE[1])
@@ -126,7 +126,8 @@ class CameraProcess(LoggingProcess):
         self.logger.log_message("started")
         self.initialize_camera()
         self.run_camera()
-        self.camera.shutdown()
+        if self.camera is not None:
+            self.camera.shutdown()
         self.logger.close()
 
     def run_camera(self):
@@ -142,11 +143,17 @@ class CameraProcess(LoggingProcess):
         """Camera idle loop, just wait until parameters are updated. Check them, and if
         CameraMode.PAUSED is still set, return here.
         """
-        self.logger.log_message("Paused aquisition")
-        self.camera.stop_acquisition()
+        self.logger.log_message("Paused acquisition")
+
+        if self.camera is not None:
+            try:
+                self.camera.stop_acquisition()
+            except Exception:
+                pass
+
         while (
-            not self.stop_event.is_set()
-            and self.parameters.camera_mode == CameraMode.PAUSED
+                not self.stop_event.is_set()
+                and self.parameters.camera_mode == CameraMode.PAUSED
         ):
             try:
                 new_parameters = self.parameter_queue.get(timeout=0.001)
@@ -161,46 +168,47 @@ class CameraProcess(LoggingProcess):
         """Camera running loop, grab frames and set new parameters if available."""
         self.logger.log_message("Started acquisition")
         self.camera.start_acquisition()
+
         while (
-            not self.stop_event.is_set()
-            and self.parameters.camera_mode != CameraMode.PAUSED
+                not self.stop_event.is_set()
+                and self.parameters.camera_mode != CameraMode.PAUSED
         ):
             frames = self.camera.get_frames()
 
-            # if no frames are received (either this loop is in between frames
-            # or we are in the waining period)
             if frames:
                 for frame in frames:
-                    self.logger.log_message(
-                        "received frame of shape " + str(frame.shape)
-                    )
-
                     self.image_queue.put(frame)
                     self.update_framerate()
 
-            # Empty parameters queue and set new parameters with the most recent value
             new_parameters = get_last_parameters(self.parameter_queue, timeout=0.001)
 
             if new_parameters is not None:
                 if new_parameters.camera_mode == CameraMode.ABORT or (
-                    new_parameters != self.parameters
+                        new_parameters != self.parameters
                 ):
                     self.update_parameters(new_parameters)
+
+    def apply_parameters_to_camera(self):
+        for attribute in ["binning", "roi", "exposure_time", "trigger_mode"]:
+            setattr(self.camera, attribute, getattr(self.parameters, attribute))
 
     def update_parameters(self, new_parameters, stop_start=True):
         """ "Set new parameters and stop and start the camera to make sure all changes take place."""
         self.parameters = new_parameters
 
+        if self.camera is None:
+            self.framerate_rec.restart()
+            self.logger.log_message("Stored parameters " + str(self.parameters))
+            return
+
         if stop_start:
             self.camera.stop_acquisition()
 
-        # In general, ROI and binning are a bit funny in their interactions, and need to be handled
-        # carefully in the specific camera interfaces.
-        for attribute in ["binning", "roi", "exposure_time", "trigger_mode"]:
-            setattr(self.camera, attribute, getattr(self.parameters, attribute))
+        self.apply_parameters_to_camera()
 
         if stop_start:
             self.camera.start_acquisition()
+
         self.framerate_rec.restart()
         self.logger.log_message("Updated parameters " + str(self.parameters))
 

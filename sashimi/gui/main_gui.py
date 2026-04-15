@@ -96,8 +96,6 @@ class MainWindow(QMainWindow):
     def check_end_experiment(self):
         if self.st.saver.saver_stopped_signal.is_set():
             self.st.end_experiment()
-            if self.st.pause_after:
-                self.wid_status.setCurrentIndex(0)
             self.refresh_param_values(omit_wid_camera=True)
             self.toolbar.experiment_progress.hide()
             self.toolbar.lbl_experiment_progress.hide()
@@ -132,18 +130,15 @@ class StatusWidget(QTabWidget):
         self.timer = timer
         self.scan_settings = self.state.status
         self.option_dict = {
-            0: "Paused",
-            1: "Calibration",
-            2: "Volume",
+            0: "Calibration",
+            1: "Volume",
         }
 
-        self.wid_paused = PausedWidget()
         self.wid_calibration = CalibrationWidget(st, st.calibration, self.timer)
         self.wid_volume = VolumeScanningWidget(st, self.timer)
 
-        self.addTab(self.wid_paused, self.option_dict[0])
-        self.addTab(self.wid_calibration, self.option_dict[1])
-        self.addTab(self.wid_volume, self.option_dict[2])
+        self.addTab(self.wid_calibration, self.option_dict[0])
+        self.addTab(self.wid_volume, self.option_dict[1])
 
         # TODO: delete this line when single-plane scanning mode is implemented
         # self.setTabEnabled(2, False)
@@ -154,8 +149,3 @@ class StatusWidget(QTabWidget):
 
     def update_status(self):
         self.state.status.scanning_state = self.option_dict[self.currentIndex()]
-
-
-class PausedWidget(QWidget):
-    def __init__(self):
-        super().__init__()

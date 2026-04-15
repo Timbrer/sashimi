@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
 )
 
 from sashimi.gui.buttons import ToggleIconButton
-from sashimi.state import State, GlobalState
+from sashimi.state import State, GlobalState, LiveCameraState
 
 
 class TopWidget(QToolBar):
@@ -60,6 +60,10 @@ class TopWidget(QToolBar):
             # Here what happens if experiment is aborted
             self.state.end_experiment()
         else:
+            if self.state.live_camera_state != LiveCameraState.RUNNING:
+                self.experiment_toggle_btn.flip_icon()
+                return
+
             if self.state.save_settings.overwrite_save_folder == 1:
                 self.overwrite_alert_popup()
             else:
@@ -75,15 +79,15 @@ class TopWidget(QToolBar):
         self.overwrite_dialog.show()
 
     def show_hide_toggle_btn(self):
-        if (
-            self.state.global_state is GlobalState.PAUSED
-            or self.state.global_state is GlobalState.PREVIEW
-        ):
-            self.experiment_toggle_btn.setEnabled(False)
-            self.experiment_progress.setEnabled(False)
-            self.lbl_experiment_progress.setEnabled(False)
+        experiment_running = self.state.is_saving_event.is_set()
 
-        else:
-            self.experiment_toggle_btn.setEnabled(True)
-            self.experiment_progress.setEnabled(True)
-            self.lbl_experiment_progress.setEnabled(True)
+        can_start = (
+                self.state.global_state is GlobalState.VOLUME_PREVIEW
+                and self.state.live_camera_state is LiveCameraState.RUNNING
+        )
+
+        enabled = experiment_running or can_start
+
+        self.experiment_toggle_btn.setEnabled(enabled)
+        self.experiment_progress.setEnabled(enabled)
+        self.lbl_experiment_progress.setEnabled(enabled)

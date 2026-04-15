@@ -12,6 +12,8 @@ from lightparam.param_qt import ParametrizedQt
 from sashimi.state import (
     State,
     get_voxel_size,
+    GlobalState,
+    LiveCameraState,
 )
 import napari
 
@@ -84,7 +86,7 @@ class ViewingWidget(QWidget):
         self.auto_contrast = True
 
         s = self.get_fullframe_size()
-        self.image_shape = (1, s, s)
+        self.image_shape = (1, s[0], s[1])
 
         self.viewer = napari.Viewer(show=False)
         # setting napari style to sashimi's
@@ -159,7 +161,7 @@ class ViewingWidget(QWidget):
         )
 
     def get_fullframe_size(self):
-        """Maximum size of the image at current binning. As stated above, we assume square sensors."""
+        """Maximum image size at current binning, returned as [height, width]."""
         binning = int(self.state.camera_settings.binning)
         return [r // binning for r in self.max_sensor_resolution]
 
@@ -285,53 +287,112 @@ class CameraSettingsWidget(QWidget):
         self.btn_roi = QPushButton(ROI_TEXTS[self.roi_state])
         self.btn_cancel_roi = QPushButton("Cancel")
         self.btn_cancel_roi.hide()
+        self.btn_run_camera = QPushButton("Run camera")
+        self.btn_pause_camera = QPushButton("Pause camera")
 
         self.layout().addWidget(self.wid_camera_settings)
         self.layout().addWidget(self.btn_roi)
         self.layout().addWidget(self.btn_cancel_roi)
+        self.layout().addWidget(self.btn_run_camera)
+        self.layout().addWidget(self.btn_pause_camera)
 
         self.btn_roi.clicked.connect(self.iterate_roi_state)
         self.btn_cancel_roi.clicked.connect(self.cancel_roi_selection)
+        self.btn_run_camera.clicked.connect(self.run_camera)
+        self.btn_pause_camera.clicked.connect(self.pause_camera)
+        self.state.status.sig_param_changed.connect(self.refresh_camera_ui_state)
+        self.refresh_camera_ui_state()
+
+    def refresh_camera_ui_state(self):
+        if self.roi_state == RoiState.DISPLAYED:
+            return
+
+        experiment_running = (
+                self.state.current_exp_state == GlobalState.EXPERIMENT_RUNNING
+        )
+        camera_running = (
+                self.state.live_camera_state == LiveCameraState.RUNNING
+        )
+
+        can_run = (
+                (not experiment_running)
+                and (not camera_running)
+        )
+
+        can_pause = (
+                (not experiment_running)
+                and camera_running
+        )
+
+        self.btn_run_camera.setEnabled(can_run)
+        self.btn_pause_camera.setEnabled(can_pause)
+
+        camera_params_editable = (
+                (not experiment_running)
+                and (not camera_running)
+        )
+        self.set_camera_controls_enabled(camera_params_editable)
+
+    def set_camera_controls_enabled(self, enabled: bool):
+        self.wid_camera_settings.setEnabled(enabled)
+        self.btn_roi.setEnabled(enabled)
+        self.btn_cancel_roi.setEnabled(enabled and self.roi_state != RoiState.FULL)
+
+    def run_camera(self):
+        self.state.run_camera_live()
+        self.refresh_camera_ui_state()
+
+    def pause_camera(self):
+        if self.state.current_exp_state == GlobalState.EXPERIMENT_RUNNING:
+            return
+
+        self.state.pause_camera_live()
+        self.refresh_camera_ui_state()
 
     def iterate_roi_state(self):
-        """Called whenever we press the set ROI button, go to state of the ROI.
-
-        The napari ROI has three states, each of them with buttons and properties etc. The code is executed depending
-        on the status the ROI is, and changes the status for the next button press call.
-        """
         try:
             self.roi_state = RoiState(self.roi_state.value + 1)
         except ValueError:
             self.roi_state = RoiState(1)
 
         if self.roi_state == RoiState.FULL:
-            self.set_full_frame()
             self._hide_roi()
+            self.set_full_frame()
             self.btn_cancel_roi.hide()
             self.wid_camera_settings.param_widgets["binning"].setEnabled(True)
+
         elif self.roi_state == RoiState.DISPLAYED:
             self._show_roi()
             self.btn_cancel_roi.show()
             self.wid_display.viewer.layers["roi_layer"].mode = Mode.SELECT
-
-            # Disable binning option if an ROI is set:
             self.wid_camera_settings.param_widgets["binning"].setEnabled(False)
+
         elif self.roi_state == RoiState.SET:
-            self._hide_roi()
             self.set_roi()
+            self._hide_roi()
             self.btn_cancel_roi.hide()
 
         self.btn_roi.setText(ROI_TEXTS[self.roi_state])
+        self.refresh_camera_ui_state()
+
+    def _deactivate_roi_interaction(self):
+        try:
+            self.roi.mode = Mode.PAN_ZOOM
+        except Exception:
+            pass
 
     def _hide_roi(self):
+        self._deactivate_roi_interaction()
         self.wid_display.roi.visible = False
 
     def _show_roi(self):
+        self._deactivate_roi_interaction()
         self.wid_display.roi.visible = True
 
     def cancel_roi_selection(self):
         self.roi_state = RoiState(3)
         self.iterate_roi_state()
+        self.refresh_camera_ui_state()
 
     def update_on_bin_change(self, changed_params):
         """Update ROI coordinates when changing the binning."""
@@ -385,7 +446,7 @@ class CameraSettingsWidget(QWidget):
         ]
 
     def set_full_frame(self):
+        self._deactivate_roi_interaction()
         s = self.wid_display.get_fullframe_size()
         self.roi.data = [np.array([[0, 0], [s[0], 0], [s[0], s[1]], [0, s[1]]])]
-
         self.state.camera_settings.roi = [0, 0, s[0], s[1]]

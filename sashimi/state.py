@@ -4,7 +4,6 @@ from queue import Empty
 from typing import Optional
 from lightparam.param_qt import ParametrizedQt
 from lightparam import Param, ParameterTree
-from typing import Union
 
 from sashimi.processes.scanning import ScannerProcess
 from sashimi.hardware.scanning.scanloops import (
@@ -13,7 +12,6 @@ from sashimi.hardware.scanning.scanloops import (
     XYScanning,
     PlanarScanning,
     ZManual,
-    ZSynced,
     ZScanning,
     TriggeringParameters,
     ScanParameters,
@@ -40,11 +38,13 @@ conf = read_config()
 
 
 class GlobalState(Enum):
-    PAUSED = 0
     PREVIEW = 1
     VOLUME_PREVIEW = 2
     EXPERIMENT_RUNNING = 3
 
+class LiveCameraState(Enum):
+    PAUSED = 0
+    RUNNING = 1
 
 class SaveSettings(ParametrizedQt):
     def __init__(self):
@@ -66,13 +66,12 @@ class ScanningSettings(ParametrizedQt):
         super().__init__()
         self.name = "general/scanning_state"
         self.scanning_state = Param(
-            "Paused",
-            ["Paused", "Calibration", "Volume"],
+            "Calibration",
+            ["Calibration", "Volume"],
         )
 
 
 scanning_to_global_state = dict(
-    Paused=GlobalState.PAUSED,
     Calibration=GlobalState.PREVIEW,
     Volume=GlobalState.VOLUME_PREVIEW,
 )
@@ -120,7 +119,7 @@ class CameraSettings(ParametrizedQt):
         self.binning = Param(conf["camera"]["default_binning"], [1, 2, 4])
         self.roi = Param(
             roi_size, gui=False
-        )  # order of params here is [hpos, vpos, hsize, vsize,]; h: horizontal, v: vertical
+        )  # order of params here is [vpos, hpos, vsize, hsize]
 
 
 def convert_planar_params(planar: PlanarScanningSettings):
@@ -268,6 +267,7 @@ class State:
             self.logger, SashimiEvents.NOISE_SUBTRACTION_ACTIVE, Event()
         )
         self.is_saving_event = LoggedEvent(self.logger, SashimiEvents.IS_SAVING)
+        self.live_camera_state = LiveCameraState.PAUSED
 
         # The even active during scanning preparation (before first real camera trigger)
         self.is_waiting_event = LoggedEvent(
@@ -288,7 +288,6 @@ class State:
 
         self.settings_tree = ParameterTree()
 
-        self.pause_after = False
         self.camera = CameraProcess(
             stop_event=self.stop_event,
         )
@@ -313,13 +312,12 @@ class State:
             saver_queue=self.saver.save_queue,
         )
 
-        self.camera_settings = CameraSettings()
         self.save_settings = SaveSettings()
 
         self.settings_tree = ParameterTree()
 
-        self.global_state = GlobalState.PAUSED
-        self.current_exp_state = GlobalState.PAUSED
+        self.global_state = scanning_to_global_state[self.status.scanning_state]
+        self.current_exp_state = self.global_state
         self.prev_exp_state = self.current_exp_state
 
         self.planar_setting = PlanarScanningSettings()
@@ -358,6 +356,14 @@ class State:
 
         self.voxel_size = None
 
+    def run_camera_live(self):
+        self.live_camera_state = LiveCameraState.RUNNING
+        self.send_camera_settings()
+
+    def pause_camera_live(self):
+        self.live_camera_state = LiveCameraState.PAUSED
+        self.send_camera_settings()
+
     def restore_tree(self, restore_file):
         with open(restore_file, "r") as f:
             self.settings_tree.deserialize(json.load(f))
@@ -368,6 +374,11 @@ class State:
 
     def change_global_state(self):
         self.global_state = scanning_to_global_state[self.status.scanning_state]
+
+        if self.current_exp_state != GlobalState.EXPERIMENT_RUNNING:
+            self.current_exp_state = self.global_state
+            self.prev_exp_state = self.current_exp_state
+
         self.send_camera_settings()
         self.send_scansave_settings()
 
@@ -406,10 +417,7 @@ class State:
     @property
     def scan_params(self):
         """Return parameters for the scanning, depending on the state."""
-        if self.global_state == GlobalState.PAUSED:
-            params = ScanParameters(state=ScanningState.PAUSED)
-
-        elif self.global_state == GlobalState.PREVIEW:
+        if self.global_state == GlobalState.PREVIEW:
             params = convert_calibration_params(
                 self.planar_setting, self.calibration.z_settings
             )
@@ -418,8 +426,9 @@ class State:
             params = convert_volume_params(
                 self.planar_setting, self.volume_setting, self.calibration
             )
+
         else:
-            return
+            raise RuntimeError(f"Unexpected global_state: {self.global_state}")
 
         params.experiment_state = self.experiment_state
         return params
@@ -437,10 +446,12 @@ class State:
             if self.global_state == GlobalState.PREVIEW
             else TriggerMode.EXTERNAL_TRIGGER
         )
-        if self.global_state == GlobalState.PAUSED:
-            camera_params.camera_mode = CameraMode.PAUSED
-        else:
-            camera_params.camera_mode = CameraMode.PREVIEW
+
+        camera_params.camera_mode = (
+            CameraMode.PREVIEW
+            if self.live_camera_state == LiveCameraState.RUNNING
+            else CameraMode.PAUSED
+        )
 
         return camera_params
 
@@ -474,6 +485,10 @@ class State:
         Sets all the signals and cleans the queue
         to trigger the start of the experiment
         """
+        if self.live_camera_state != LiveCameraState.RUNNING:
+            self.logger.log_message("experiment start rejected: camera not running")
+            return
+
         self.current_exp_state = GlobalState.EXPERIMENT_RUNNING
         self.logger.log_message("started experiment")
         self.scanner.wait_signal.set()
@@ -494,7 +509,7 @@ class State:
         self.is_saving_event.clear()
         self.saver.save_queue.clear()
         self.send_scansave_settings()
-        self.current_exp_state = GlobalState.PAUSED
+        self.current_exp_state = self.global_state
 
     def is_exp_started(self) -> bool:
         """
@@ -506,7 +521,7 @@ class State:
         """
         if (
             self.current_exp_state == GlobalState.EXPERIMENT_RUNNING
-            and self.prev_exp_state == GlobalState.PAUSED
+            and self.prev_exp_state != GlobalState.EXPERIMENT_RUNNING
         ):
             self.prev_exp_state = GlobalState.EXPERIMENT_RUNNING
             return True
@@ -523,9 +538,9 @@ class State:
         """
         if (
             self.prev_exp_state == GlobalState.EXPERIMENT_RUNNING
-            and self.current_exp_state == GlobalState.PAUSED
+            and self.current_exp_state != GlobalState.EXPERIMENT_RUNNING
         ):
-            self.prev_exp_state = GlobalState.PAUSED
+            self.prev_exp_state = self.current_exp_state
             return True
         else:
             return False

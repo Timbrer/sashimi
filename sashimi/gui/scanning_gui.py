@@ -1,7 +1,6 @@
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
-    QCheckBox,
 )
 from lightparam.gui import ParameterGui
 from lightparam.gui.collapsible_widget import CollapsibleWidget
@@ -23,7 +22,6 @@ class VolumeScanningWidget(QWidget):
         self.timer = timer
         self.setLayout(QVBoxLayout())
         self.wid_volume = ParameterGui(state.volume_setting)
-        self.chk_pause = QCheckBox("Pause after experiment")
 
         self.wid_wave = WaveformWidget(timer=self.timer, state=self.state)
         self.wid_collapsible_wave = CollapsibleWidget(
@@ -32,12 +30,4 @@ class VolumeScanningWidget(QWidget):
         self.wid_collapsible_wave.toggle_collapse()
 
         self.layout().addWidget(self.wid_volume)
-        self.layout().addWidget(self.chk_pause)
         self.layout().addWidget(self.wid_collapsible_wave)
-
-        self.chk_pause.clicked.connect(self.change_pause_status)
-
-        self.chk_pause.click()
-
-    def change_pause_status(self):
-        self.state.pause_after = self.chk_pause.isChecked()

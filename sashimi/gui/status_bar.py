@@ -36,10 +36,7 @@ class StatusBarWidget(QStatusBar):
         self.update_frame_size()
         self.update_voxel_size()
         self.update_warning_msg()
-        if self.state.global_state == GlobalState.PAUSED:
-            self.hide()
-        else:
-            self.show()
+        self.show()
 
     def update_framerate_view(self):
         """Update the framerate and check whether it is fast enough for the current
@@ -55,7 +52,6 @@ class StatusBarWidget(QStatusBar):
 
         # Find the expected framerate depending on the global state
         expected_frame_rate_dict = {
-            GlobalState.PAUSED: None,
             GlobalState.PREVIEW: None,
             GlobalState.VOLUME_PREVIEW: self.state.volume_setting.frequency
             * self.state.n_planes,
