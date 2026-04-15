@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
 )
 from lightparam.gui import ParameterGui
-from sashimi.state import Calibration
+from sashimi.state import Calibration, LiveCameraState
 from lightparam.param_qt import ParametrizedQt
 from lightparam import Param
 
@@ -66,6 +66,10 @@ class CalibrationWidget(QWidget):
         self.wid_settings.refresh_widgets()
         self.update_label()
 
+    def refresh_noise_subtraction_controls(self):
+        camera_running = self.state.live_camera_state == LiveCameraState.RUNNING
+        self.chk_noise_subtraction.setEnabled(camera_running)
+
     def update_label(self):
         self.lbl_calibration.setText(
             "\n".join(
@@ -89,6 +93,7 @@ class CalibrationWidget(QWidget):
         self.chk_noise_subtraction.setChecked(
             self.state.noise_subtraction_active.is_set()
         )
+        self.refresh_noise_subtraction_controls()
 
     def set_noise_subtraction_mode(self):
         # check by the status of the check box
