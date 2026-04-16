@@ -362,7 +362,9 @@ class State:
 
     def pause_camera_live(self):
         self.live_camera_state = LiveCameraState.PAUSED
+
         self.send_camera_settings()
+        self.send_scansave_settings()
 
     def restore_tree(self, restore_file):
         with open(restore_file, "r") as f:
