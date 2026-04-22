@@ -94,12 +94,12 @@ class MainWindow(QMainWindow):
 
     # TODO: Avoid hierarchy in GUI by emitting a PyQt5.QtCore.pyqtSignal() when experiment ends/aborts
     def check_end_experiment(self):
-        if self.st.saver.saver_stopped_signal.is_set():
+        if self.st.saver_stopped_signal.is_set():
             self.st.end_experiment()
             self.refresh_param_values(omit_wid_camera=True)
             self.toolbar.experiment_progress.hide()
             self.toolbar.lbl_experiment_progress.hide()
-            self.st.saver.saver_stopped_signal.clear()
+            self.st.saver_stopped_signal.clear()
             self.toolbar.experiment_toggle_btn.flip_icon(False)
 
         # check if experiment started or ended and update gui enabling
