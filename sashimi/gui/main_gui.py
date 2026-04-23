@@ -153,9 +153,15 @@ class StatusWidget(QTabWidget):
     def is_camera_running(self):
         return self.state.live_camera_state == LiveCameraState.RUNNING
 
+    def has_valid_calibration(self):
+        return self.state.has_valid_calibration()
+
     def refresh_volume_tab_enabled_state(self):
         camera_running = self.is_camera_running()
-        self.setTabEnabled(self._volume_index, camera_running)
+        calibration_ready = self.has_valid_calibration()
+        self.setTabEnabled(self._volume_index, camera_running and calibration_ready)
+        if not calibration_ready and self.currentIndex() == self._volume_index:
+            self.setCurrentIndex(self._fallback_index)
 
     def update_status(self):
         self.state.status.scanning_state = self.option_dict[self.currentIndex()]

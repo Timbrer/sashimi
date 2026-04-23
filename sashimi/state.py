@@ -261,6 +261,7 @@ class State:
         self.calibration_ref = None
         self.waveform = None
         self.current_plane = 0
+        self.volume_waveforms_dirty = False
         self.stop_event = LoggedEvent(self.logger, SashimiEvents.CLOSE_ALL)
         self.restart_event = LoggedEvent(self.logger, SashimiEvents.RESTART_SCANNING)
         self.prepare_event = LoggedEvent(self.logger, SashimiEvents.PREPARE_SCANNING)
@@ -405,6 +406,8 @@ class State:
         del param_changed
         if self.global_state == GlobalState.PREVIEW:
             self.send_preview_scansave_settings()
+        elif self.global_state == GlobalState.VOLUME_PREVIEW:
+            self.mark_volume_waveforms_dirty()
 
     def handle_calibration_settings_change(self, param_changed=None):
         del param_changed
@@ -414,6 +417,20 @@ class State:
     def handle_volume_settings_change(self, param_changed=None):
         del param_changed
         self.voxel_size = get_voxel_size(self.volume_setting, self.camera_settings)
+        if self.global_state == GlobalState.VOLUME_PREVIEW:
+            self.mark_volume_waveforms_dirty()
+
+    def handle_calibration_points_change(self):
+        self.mark_volume_waveforms_dirty()
+
+    def mark_volume_waveforms_dirty(self):
+        self.volume_waveforms_dirty = True
+
+    def has_valid_calibration(self):
+        return (
+            self.calibration.calibration is not None
+            and len(self.calibration.calibrations_points) >= 2
+        )
 
     def handle_save_settings_change(self, param_changed=None):
         del param_changed
@@ -443,6 +460,7 @@ class State:
         if self.global_state != GlobalState.VOLUME_PREVIEW:
             return
 
+        self.volume_waveforms_dirty = False
         self.prepare_event.set()
         self.restart_volume_playback()
 
@@ -534,12 +552,15 @@ class State:
         self.current_exp_state = GlobalState.EXPERIMENT_RUNNING
         self.logger.log_message("started experiment")
         if self.global_state == GlobalState.VOLUME_PREVIEW:
-            self.restart_volume_playback()
+            if self.volume_waveforms_dirty:
+                self.refresh_volume_waveforms()
+            else:
+                self.restart_volume_playback()
         else:
             self.send_preview_scansave_settings()
         self.send_manual_duration()
-        self.saver.save_queue.empty()
-        self.camera.image_queue.empty()
+        self.saver.save_queue.clear()
+        self.camera.image_queue.clear()
         time.sleep(0.01)
         self.is_saving_event.set()
 

@@ -29,13 +29,9 @@ class CalibrationWidget(QWidget):
         self.timer = timer
         self.wid_settings = ParameterGui(self.calibration_state.z_settings)
         self.btn_add_points = QPushButton("+")
-        self.btn_add_points.clicked.connect(
-            self.calibration_state.add_calibration_point
-        )
+        self.btn_add_points.clicked.connect(self.add_calibration_point)
         self.btn_rm_points = QPushButton("-")
-        self.btn_rm_points.clicked.connect(
-            self.calibration_state.remove_calibration_point
-        )
+        self.btn_rm_points.clicked.connect(self.remove_calibration_point)
         self.lbl_calibration = QLabel("")
         self.chk_noise_subtraction = QCheckBox()
         self.chk_noise_subtraction.setText("Enable noise subtraction")
@@ -61,6 +57,14 @@ class CalibrationWidget(QWidget):
 
         self.chk_noise_subtraction.clicked.connect(self.set_noise_subtraction_mode)
         self.timer.timeout.connect(self.update_label)
+
+    def add_calibration_point(self):
+        self.calibration_state.add_calibration_point()
+        self.state.handle_calibration_points_change()
+
+    def remove_calibration_point(self):
+        self.calibration_state.remove_calibration_point()
+        self.state.handle_calibration_points_change()
 
     def refresh_widgets(self):
         self.wid_settings.refresh_widgets()
